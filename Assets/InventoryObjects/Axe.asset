@@ -9,9 +9,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3ae429a478eb74e48803807cfb4bdd3c, type: 3}
-  m_Name: ShopkeeperInteractConversation
+  m_Script: {fileID: 11500000, guid: cd6fc989cf2f0ce4285edc94a340c125, type: 3}
+  m_Name: Axe
   m_EditorClassIdentifier: 
-  conversationNodes:
-  - {fileID: 11400000, guid: 43392f63f6b0ff047a8483e33564bce2, type: 2}
-  - {fileID: 11400000, guid: b4327e07da8a8124796699482e45e90f, type: 2}
+  objectName: Axe
+  objectDescription: 'A heavy steel axe. Cost: 50 coins'
+  objectImage: {fileID: 21300000, guid: c561611b6634a2a439757b251f5b2d42, type: 3}
+  objectPrice: 50

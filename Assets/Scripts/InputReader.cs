@@ -9,6 +9,7 @@ public class InputReader : MonoBehaviour, Controls.IPlayerActions
     public static InputReader Instance {get; private set;}
     public Vector2 MovementValue {get; private set;}
     public event Action InteractEvent;
+    public event Action LeaveEvent;
 
     private Controls controls;
 
@@ -41,5 +42,12 @@ public class InputReader : MonoBehaviour, Controls.IPlayerActions
     public void OnMove(InputAction.CallbackContext context)
     {
         MovementValue = context.ReadValue<Vector2>();
+    }
+
+    public void OnLeave(InputAction.CallbackContext context)
+    {
+        if (!context.performed) {return;}
+        
+        LeaveEvent?.Invoke();
     }
 }

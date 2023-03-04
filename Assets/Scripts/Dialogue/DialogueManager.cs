@@ -17,17 +17,27 @@ public class DialogueManager : MonoBehaviour
 	[SerializeField] private AudioSource dialogueAudioSource;
 	[SerializeField] private Transform exitConversationButton;
     [SerializeField] private GameObject shopCamera;
+    [SerializeField] private ConversationNode shoppingNode;
+    [SerializeField] private ConversationNode purchaseNode;
+    [SerializeField] private ConversationNode notEnoughCoinsNode;
 	[SerializeField] private float timeBetweenLetterTyping;
 
 	// TRACKERS
 	private Conversation currentConversation;
-	private Dialogue currentDialogue;
-	private string currentSentence;
+	public Dialogue currentDialogue;
+    private Dialogue defaultBrowsingDialogue;
+    
+    private InventoryObject selectedInventoryObject;
+	public string currentSentence;
 	public bool inConversation = false;
+	public bool inShoppingMode = false;
+    public bool hoveringOverItem = false;
+    public bool purchasing = false; 
 	private bool currentTextTyping = false;
 	private Coroutine typingCoroutine;
 	private Queue<ConversationNode> conversationNodes;
 	private Queue<string> sentences;
+    private int itemLayerMask;
 
 
 	private void Awake()
@@ -42,18 +52,67 @@ public class DialogueManager : MonoBehaviour
 
 		sentences = new Queue<string>();
 		conversationNodes = new Queue<ConversationNode>();
+        itemLayerMask = 1 << 6;
     }
 
 	void Start()
 	{
 		InputReader.Instance.InteractEvent += OnInteract;
+		InputReader.Instance.LeaveEvent += OnLeave;
 	}
 
+    private void Update() 
+    {
+        if (inShoppingMode)
+        {
+            Ray mouseRay = Camera.main.ScreenPointToRay(Input.mousePosition);
+            //Debug.Log("Mouse pos:" + Input.mousePosition);
+            RaycastHit hit;
+            if (Physics.Raycast(mouseRay, out hit, 100f, itemLayerMask))
+            {
+                if (hit.collider.gameObject.TryGetComponent<ShopItem>(out ShopItem item))
+                {
+                    StopCoroutine(typingCoroutine);
+                    item.TryStartItemDialogue();
+                }
+            }
+            else
+            {
+                SetItemText();
+                hoveringOverItem = false;
+            }
+        }
+
+        if (inShoppingMode && !hoveringOverItem && (currentDialogue != defaultBrowsingDialogue))
+        {
+            StartDialogue(defaultBrowsingDialogue);
+        }
+    }
+ 
 	private void OnInteract()
 	{
-		if (inConversation && currentDialogue != null)
+        if (purchasing)
+        {
+            if (Inventory.Instance.GetPlayerCurrency() < selectedInventoryObject.objectPrice)
+            {
+                StartDialogue(notEnoughCoinsNode);
+            }
+            else
+            {
+                Inventory.Instance.SpendPlayerCurrency(selectedInventoryObject.objectPrice);
+                Inventory.Instance.AddToInventory(selectedInventoryObject);
+                StartDialogue(purchaseNode);
+            }
+            purchasing = false;
+            conversationNodes.Enqueue(shoppingNode);
+        }
+        else if (hoveringOverItem)
+        {
+            TryPurchaseItem(selectedInventoryObject);
+        }
+        else if (inConversation && currentDialogue != null)
 		{
-			if (!currentTextTyping)
+			if (!currentTextTyping && !inShoppingMode)
 			{
 				DisplayNextSentence();
 			}
@@ -64,15 +123,43 @@ public class DialogueManager : MonoBehaviour
 		}
 	}
 
-    // public void SetItemText()
-	// {
-	// 	itemText.text = "";
-	// }
+    private void TryPurchaseItem(InventoryObject selectedInventoryObject)
+    {
+        inShoppingMode = false;
+        hoveringOverItem = false;
+        purchasing = true;
+        currentSentence = "Would you like to purchase the " + selectedInventoryObject.objectName + "? \n YES - [Spacebar]   NO - [Tab]";
+		typingCoroutine = StartCoroutine(TypeSentence(currentSentence));
+    }
 
-	public void SetItemText(Dialogue dialogue)
+    private void OnLeave()
+    {
+        if (purchasing)
+        {
+            purchasing = false;
+            //conversationNodes.Enqu
+            StartDialogue(shoppingNode);
+        }
+        else
+        {
+            ExitConversation();
+        }
+    }
+
+    public void SetItemText()
 	{
-		//itemText.text = dialogue.characterName;		
+		itemText.text = "";
 	}
+
+	public void SetItemText(string itemName)
+	{
+		itemText.text = itemName;	
+	}
+
+    public void SetSelectedItem(InventoryObject inventoryObject)
+    {
+        selectedInventoryObject = inventoryObject;
+    }
 
 	public void ShowInteractText()
 	{
@@ -89,8 +176,10 @@ public class DialogueManager : MonoBehaviour
 	{
         shopCamera.SetActive(true);
 		inConversation = true;
+        inShoppingMode = false;
 		dialogueAnimator.SetTrigger("startConversation");
 		currentConversation = conversation;
+        exitConversationButton.gameObject.SetActive(true);
 		conversationNodes.Clear();
 		dialogueAudioSource.volume = SoundManager.Instance.GetSoundEffectVolume() / 2;
 		foreach (ConversationNode conversationNode in currentConversation.conversationNodes)
@@ -110,6 +199,17 @@ public class DialogueManager : MonoBehaviour
 				currentDialogue = ScriptableObject.CreateInstance<Dialogue>();
 				AddItem((DialogueAddItem)conversationNode);
 				break;
+            case "DialogueEvent":
+                DialogueEvent dialogueEvent = (DialogueEvent)conversationNode;
+                if (dialogueEvent.enableShoppingMode)
+                {
+                    EnableShoppingMode(dialogueEvent.shoppingModeDialogue);
+                }
+                else
+                {
+                    DisableShoppingMode();
+                }
+                break;
 
 			default:
 			case "Dialogue":
@@ -140,12 +240,38 @@ public class DialogueManager : MonoBehaviour
 		}
 	}
 
+    private void EnableShoppingMode(Dialogue browseDialogue)
+    {
+        defaultBrowsingDialogue = browseDialogue;
+        StartDialogue(defaultBrowsingDialogue);
+        inShoppingMode = true;
+
+        //Clears dialogue
+        //goes into a state where mousing over an item makes it rotate + brings up it's name and description
+    }
+
+    // private void TypeBrowsingDialogue()
+    // {
+    //     currentSentence = defaultBrowsingDialogue.sentences[0];
+    //     typingCoroutine = StartCoroutine(TypeSentence(currentSentence));
+    // }
+
+    private void DisableShoppingMode()
+    {
+        inShoppingMode = false;
+        defaultBrowsingDialogue = null;
+    }
+
     //something like Present Item Options?
 
+    public void SetSentence(string sentence)
+    {
+        dialogueText.text = sentence;
+    }
 
 	public void DisplayNextSentence()
 	{
-		SetItemText(currentDialogue);
+		//SetItemText(currentDialogue);
 		if (sentences.Count == 0)
 		{
 			EndDialogue();
@@ -181,15 +307,14 @@ public class DialogueManager : MonoBehaviour
 		currentTextTyping = false;
     }
 
-	public void ExitConversationButton()
-	{
-		exitConversationButton.gameObject.SetActive(false);
-		EndDialogue();
+	public void ExitConversation()
+	{   
+        DisableShoppingMode();
+		EndConversation();
 	}
 
 	public void EndDialogue()
 	{		
-		//SetItemText();
 		StartCoroutine(TypeSentence(""));
 		
 		if (conversationNodes.TryDequeue(out ConversationNode nextNode))
@@ -205,6 +330,7 @@ public class DialogueManager : MonoBehaviour
 	private void EndConversation()
 	{
         shopCamera.SetActive(false);
+        exitConversationButton.gameObject.SetActive(false);
 		dialogueAnimator.SetTrigger("endConversation");
 			StartCoroutine(DialogueCooldown());
 	}

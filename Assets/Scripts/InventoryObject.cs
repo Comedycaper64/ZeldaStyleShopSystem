@@ -11,4 +11,5 @@ public class InventoryObject : ScriptableObject
    [TextArea(3, 10)]
    public string objectDescription;
    public Sprite objectImage;
+   public int objectPrice;
 }
