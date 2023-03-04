@@ -34,6 +34,7 @@ public class DialogueManager : MonoBehaviour
     public bool hoveringOverItem = false;
     public bool purchasing = false; 
 	private bool currentTextTyping = false;
+    private ShopItem spinningShopItem;
 	private Coroutine typingCoroutine;
 	private Queue<ConversationNode> conversationNodes;
 	private Queue<string> sentences;
@@ -66,7 +67,6 @@ public class DialogueManager : MonoBehaviour
         if (inShoppingMode)
         {
             Ray mouseRay = Camera.main.ScreenPointToRay(Input.mousePosition);
-            //Debug.Log("Mouse pos:" + Input.mousePosition);
             RaycastHit hit;
             if (Physics.Raycast(mouseRay, out hit, 100f, itemLayerMask))
             {
@@ -74,11 +74,17 @@ public class DialogueManager : MonoBehaviour
                 {
                     StopCoroutine(typingCoroutine);
                     item.TryStartItemDialogue();
+                    spinningShopItem = item;
                 }
             }
             else
             {
                 SetItemText();
+                if (spinningShopItem)
+                {
+                    spinningShopItem.StopSpinning();
+                    spinningShopItem = null;
+                }
                 hoveringOverItem = false;
             }
         }

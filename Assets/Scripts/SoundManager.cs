@@ -22,9 +22,9 @@ public class SoundManager : MonoBehaviour
         }
         Instance = this;
 
-        masterVolume = 0.5f;
+        masterVolume = 1f;
         musicVolume = 0.25f;
-        sfxVolume = 0.5f;
+        sfxVolume = 1f;
     }
 
     public float GetMusicVolume()
